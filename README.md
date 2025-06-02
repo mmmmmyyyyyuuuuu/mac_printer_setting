@@ -1,0 +1,2 @@
+# mac_printer_setting
+プリンター再設定用AppleScript
