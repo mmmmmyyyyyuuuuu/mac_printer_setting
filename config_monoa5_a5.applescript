@@ -1,9 +1,8 @@
 property targetPrinterName : "MONOA5"
-property targetPresetName : "MONOA5_A5_Preset"
+property targetPresetName : "MONOA5"
 property targetPaperSizeName : "A5" -- 一般的な用紙サイズ名。正確な名前は exactA5PaperSizeName を使用
 property exactA5PaperSizeName : "A5  148 x 210 mm" -- ダイアログ上の正確な表示名（空白2つに注意）
 
--- AXIdentifiers（Accessibility Inspector で確認した値）
 property printerPopupAXID : "_NS:70" -- プリンタ選択ポップアップ
 property paperSizePopupAXID : "_NS:42" -- 用紙サイズ選択ポップアップ
 property presetsPopupAXID : "_NS:8" -- プリセット選択ポップアップ（「デフォルト設定」表示時）
@@ -11,6 +10,7 @@ property presetsPopupAXID : "_NS:8" -- プリセット選択ポップアップ�
 global textEditLaunchedByScript
 set textEditLaunchedByScript to false
 
+delay 1
 try
 	-- ① TextEdit を起動し、空のドキュメントを用意
 	tell application "TextEdit"
@@ -41,12 +41,12 @@ try
 			keystroke "p" using command down
 			
 			set printSheet to missing value
-			repeat 20 times -- 最大10秒待機
+			repeat 50 times -- 最大10秒待機
 				if exists sheet 1 of documentWindow then
 					set printSheet to sheet 1 of documentWindow
 					exit repeat
 				end if
-				delay 0.5
+				delay 0.2
 			end repeat
 			
 			if printSheet is missing value then
@@ -313,20 +313,43 @@ try
 				delay 1.5
 				
 				-- ⑥ 空印刷（Print ボタンをクリック）
-				set printButtonNameJpn to "プリント"
-				set printButtonNameEng to "Print"
 				set finalPrintButton to missing value
-				if exists button printButtonNameJpn then
-					set finalPrintButton to button printButtonNameJpn
-				else if exists button printButtonNameEng then
-					set finalPrintButton to button printButtonNameEng
-				end if
+				set allElements to entire contents of printSheet
+				repeat with el in allElements
+					try
+						if (role of el is "AXButton") and ((name of el is "プリント") or (name of el is "Print")) then
+							set finalPrintButton to el
+							exit repeat
+						end if
+					end try
+				end repeat
 				
 				if finalPrintButton is missing value then
-					key code 53 -- Escape キーでダイアログ閉じ
+					display dialog "印刷ボタンが見つかりませんでした（名前が 'プリント' または 'Print' のボタン）" buttons {"OK"} default button "OK"
+					key code 53
 				else
 					click finalPrintButton
+					delay 1
+					
+					-- 印刷キューに入るのを待つ
+					set foundJob to false
+					repeat 50 times -- 最大10秒
+						try
+							set jobList to do shell script "lpstat -o " & targetPrinterName
+							if jobList is not "" then
+								set foundJob to true
+								exit repeat
+							end if
+						end try
+						delay 0.2
+					end repeat
+					
+					if not foundJob then
+						display dialog "印刷ジョブがプリントキューに入りませんでした。" buttons {"OK"} default button "OK"
+					end if
 				end if
+				
+				
 			end tell
 		end tell
 	end tell
